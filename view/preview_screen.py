@@ -106,7 +106,7 @@ def display_pdf(pdf_bytes, height: int):
 
 
 def reset_data():
-    prefill_data = ss["resume_data"]
+    prefill_data = ss["resume_input"]
     ss.clear()
     ss["prefill_data"] = prefill_data
 
@@ -167,10 +167,12 @@ def preview_screen(app_env: str = None, airtable_client: Api = None):
                     rating = st.feedback(options="stars")
                     feedback = st.text_area("(Optional) Please provide feedback on how the resume builder can be improved.")
                     submit = st.form_submit_button("Submit")
-                
+                    
+                    # Remove 0-index
+                    rating = rating + 1 
                 if submit:
                     
-                    if rating:
+                    if rating is not None:
                         with st.spinner("Submitting Feedback..."):
                             data = {
                                 "Rating": rating,
