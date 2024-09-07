@@ -21,7 +21,11 @@ def initialize_resume_chain() -> RunnableSerializable:
         }
     )
     
-    chain = prompt | llm | response_schema
+    chain = (
+        prompt 
+        | llm 
+        | response_schema
+    ).with_config({"run_name": "Resume Builder"})
     return chain
 
 
