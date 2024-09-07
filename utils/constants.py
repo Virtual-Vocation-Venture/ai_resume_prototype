@@ -8,6 +8,7 @@ Contact Info:
 {phone_number}
 {linkedin_profile}
 {github_profile}
+NOTE: when presented links, return the URL, not markdown format
 
 Experience:
 {experience}

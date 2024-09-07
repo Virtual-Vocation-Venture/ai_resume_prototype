@@ -1,5 +1,5 @@
-from pydantic import BaseModel, model_validator, HttpUrl, EmailStr
-from typing import Any, ClassVar, Optional, List
+from pydantic import BaseModel, model_validator
+from typing import Any, ClassVar, Optional, List, Dict
 
 
 class ResumeInput(BaseModel):
@@ -48,9 +48,9 @@ class ResumeInput(BaseModel):
 class ContactInfo(BaseModel):
     location: str
     phone_number: str
-    email: EmailStr
-    linkedin_profile: HttpUrl
-    github_profile: HttpUrl
+    email: str
+    linkedin_profile: str
+    github_profile: str
 class Experience(BaseModel):
     job_title: str
     company: str
@@ -61,7 +61,7 @@ class Experience(BaseModel):
 class Project(BaseModel):
     title: str
     description: str
-    github_link: Optional[HttpUrl]
+    github_link: Optional[str]
     technologies: Optional[List[str]]
 class Education(BaseModel):
     degree: str
@@ -89,3 +89,38 @@ class ResumeSchema(BaseModel):
     involvement: List[Involvement]
     skills: Skills
     summary: Optional[str]
+    target_job_title: str
+    target_job_description: str
+
+    def flatten(self) -> Dict[str, Any]:
+        flattened = {}
+
+        for field in self.model_fields.keys():
+            if field == "name":
+                flattened[field] = self.name
+            if field == "contact_info":
+                flattened["email"] = self.contact_info.email
+                flattened["phone number"] = self.contact_info.phone_number
+                flattened["linkedin profile"] = self.contact_info.linkedin_profile
+                flattened["github profile"] = self.contact_info.github_profile
+            elif field == "experience":
+                flattened[field] = "\n".join([f"{exp.job_title} - {exp.company}" for exp in self.experience])
+            elif field == "projects":
+                flattened[field] = "\n".join([f"{proj.title} - {proj.description}" for proj in self.projects])
+            elif field == "education":
+                flattened[field] = "\n".join([f"{edu.degree} - {edu.school}" for edu in self.education])
+            elif field == "certificates":
+                flattened[field] = "\n".join([f"{cert.name} - {cert.date}" for cert in self.certificates])
+            elif field == "involvement":
+                flattened[field] = "\n".join([f"{inv.role} - {inv.organization}" for inv in self.involvement])
+            elif field == "skills":
+                flattened[field] = ", ".join(self.skills.all_skills)
+            elif field == "summary" and self.summary:
+                flattened[field] = self.summary
+            elif field == "target_job_title":
+                flattened["target job title"] = self.target_job_title
+            elif field == "target_job_description":
+                flattened["target job description"] = self.target_job_description
+
+
+        return flattened

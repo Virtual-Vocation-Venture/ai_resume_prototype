@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import base64
 from streamlit import session_state as ss
@@ -8,8 +9,10 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib import colors
 from datetime import datetime
+from pyairtable import Api
 from schemas import ResumeSchema
 from utils.ai import invoke_resume_chain
+from utils.airtable import create_airtable_record
 
 
 def save_resume_to_pdf(resume_data: ResumeSchema):
@@ -89,28 +92,46 @@ def save_resume_to_pdf(resume_data: ResumeSchema):
     return pdf_bytes, file_name
 
 
-def display_pdf(pdf_bytes):
+def display_pdf(pdf_bytes, height: int):
     # Get PDF bytes from BytesIO and encode in B64
     base64_pdf = base64.b64encode(pdf_bytes.read()).decode("utf-8")
 
     # Embedding PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
+    pdf_display = f"""
+    <iframe src="data:application/pdf;base64,{base64_pdf}#toolbar=0" width="100%" height="{height * 0.8}"></iframe>
+    """
 
     # Displaying File
     st.markdown(pdf_display, unsafe_allow_html=True)
 
 
-def preview_screen(app_env: str = None):
+def reset_data():
+    prefill_data = ss["resume_data"]
+    ss.clear()
+    ss["prefill_data"] = prefill_data
+
+
+def preview_screen(app_env: str = None, airtable_client: Api = None):
     """
     Renders the preview screen for the resume builder.
     """
-    st.title("Preview")
+    
+    col1, col2 = st.columns([0.7, 0.3])
     
     with st.spinner("Generating Resume..."):
         # Check if cache exists
         if "resume_data" not in ss:
+            # Invoke LLM chain to generate resume data
             resume_data = invoke_resume_chain(ss["resume_input"])
-        
+            
+            # Create record in Airtable
+            create_airtable_record(
+                airtable_client, 
+                os.getenv("AIRTABLE_RESUME_TABLE_ID"), 
+                resume_data.flatten(),
+                os.getenv("AIRTABLE_BASE_ID")
+            )
+            
             # Cache resume data in ss for future use
             ss["resume_data"] = resume_data
         else:
@@ -118,5 +139,51 @@ def preview_screen(app_env: str = None):
             resume_data = ss["resume_data"]
         
         pdf_bytes, file_name = save_resume_to_pdf(resume_data)
-        
-        display_pdf(pdf_bytes)
+    
+    
+    container_height = 500
+    with col1:
+        with st.container(height=container_height):
+            st.header("Resume Preview")
+            c1, c2 = st.columns([1,3])
+            with c1:
+                st.download_button(
+                    label="Download",
+                    data=pdf_bytes,
+                    file_name=file_name,
+                    mime="application/pdf"
+                )
+            with c2:
+                st.button("Restart Builder", on_click=reset_data)
+            display_pdf(pdf_bytes, container_height)
+    
+    with col2:
+        with st.container(height=container_height):
+            st.header("Feedback")
+            st.caption("Tell us how we did!")
+            
+            with st.empty():
+                with st.form("Feedback", border=False):
+                    rating = st.feedback(options="stars")
+                    feedback = st.text_area("(Optional) Please provide feedback on how the resume builder can be improved.")
+                    submit = st.form_submit_button("Submit")
+                
+                if submit:
+                    
+                    if rating:
+                        with st.spinner("Submitting Feedback..."):
+                            data = {
+                                "Rating": rating,
+                                "Feedback": feedback,
+                                "Date": datetime.today().date().isoformat()
+                            }
+                            create_airtable_record(
+                                airtable_client, 
+                                os.getenv("AIRTABLE_FEEDBACK_TABLE_ID"), 
+                                data,
+                                os.getenv("AIRTABLE_BASE_ID")
+                            )
+                        st.empty()
+                        st.success("Thank you for your feedback!")
+                    else:
+                        st.toast("Please provide a rating.")
