@@ -161,6 +161,7 @@ def preview_screen(app_env: str = None, airtable_client: Api = None):
         with st.container(height=container_height):
             st.header("Feedback")
             st.caption("Tell us how we did!")
+            rating = 0 # init rating
             
             with st.empty():
                 with st.form("Feedback", border=False):
